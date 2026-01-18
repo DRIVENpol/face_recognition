@@ -8,7 +8,7 @@ Rute disponibile:
     /admin/  -> Interfața de administrare Django (pentru dezvoltatori)
     /        -> Dashboard-ul de control acces (aplicația principală)
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

@@ -12,7 +12,7 @@ Rute API disponibile:
     /api/decide/<id>       -> Aprobare/Respingere încercare (POST)
     /captures/<filename>   -> Servire fotografii capturate (GET)
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

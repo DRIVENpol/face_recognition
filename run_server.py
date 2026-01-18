@@ -13,7 +13,7 @@ Funcționalități:
 Utilizare:
     python run_server.py
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

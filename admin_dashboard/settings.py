@@ -8,7 +8,7 @@ Documentație Django:
     https://docs.djangoproject.com/en/4.2/topics/settings/
     https://docs.djangoproject.com/en/4.2/ref/settings/
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

@@ -4,7 +4,7 @@ Modele de date pentru aplicația de Control Acces
 Acest fișier definește structura bazei de date folosind ORM-ul Django.
 Fiecare clasă reprezintă un tabel în baza de date SQLite.
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

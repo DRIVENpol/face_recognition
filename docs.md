@@ -8,8 +8,7 @@
 5. [Structura proiectului](#5-structura-proiectului)
 6. [Instalare și configurare](#6-instalare-și-configurare)
 7. [Cum se folosește](#7-cum-se-folosește)
-8. [Pornire automată la login](#8-pornire-automată-la-login)
-9. [Întrebări frecvente](#9-întrebări-frecvente)
+8. [Întrebări frecvente](#8-întrebări-frecvente)
 
 ---
 
@@ -155,7 +154,7 @@ Stochează toate încercările de acces pentru audit și istoric.
 | Bibliotecă | Versiune | Utilizare |
 |------------|----------|-----------|
 | Django | 4.2+ | Framework web pentru dashboard |
-| imagesnap | - | Capturare foto de la camera web (macOS CLI tool) |
+| AVFoundation | (nativ) | Capturare foto de la camera web (framework macOS nativ) |
 | watchdog | 3.x | Monitorizare modificări fișiere |
 | requests | 2.x | Comunicare HTTP cu serverul |
 | pyngrok | 5.x | Tunel pentru acces de la distanță |
@@ -179,10 +178,7 @@ face_recognition/
 ├── run_server.py           # Pornește serverul Django + ngrok
 ├── manage.py               # Utilitarul Django
 ├── docs.md                 # Această documentație
-│
-├── setup_autostart.sh      # Script pentru pornire automată la login
-├── com.security.monitor.plist  # Configurare LaunchAgent pentru monitor
-├── com.security.server.plist   # Configurare LaunchAgent pentru server
+├── requirements.txt        # Dependențele Python
 │
 ├── admin_dashboard/        # Configurări Django
 │   ├── __init__.py
@@ -202,6 +198,8 @@ face_recognition/
 ├── captures/               # Fotografiile capturate (creat automat)
 │   └── capture_*.jpg
 │
+├── .camera_capture         # Binar compilat pentru captură foto (creat automat)
+│
 └── db.sqlite3              # Baza de date SQLite (creat automat)
 ```
 
@@ -212,9 +210,8 @@ face_recognition/
 | `monitor.py` | Scriptul principal care monitorizează folderul și gestionează fluxul de aprobare |
 | `config.py` | Toate setările configurabile (folder protejat, timeout, server, etc.) |
 | `run_server.py` | Pornește serverul web Django și optional tunelul ngrok |
-| `setup_autostart.sh` | Script Bash pentru gestionarea pornirii automate la login |
-| `com.security.monitor.plist` | Configurare macOS LaunchAgent pentru monitor |
-| `com.security.server.plist` | Configurare macOS LaunchAgent pentru server |
+| `requirements.txt` | Lista dependențelor Python necesare |
+| `.camera_capture` | Binar Swift compilat automat pentru captura foto (AVFoundation) |
 | `settings.py` | Configurările framework-ului Django |
 | `models.py` | Definește structura bazei de date (modelul AccessAttempt) |
 | `views.py` | Funcțiile care răspund la cereri HTTP (endpoint-uri API) |
@@ -228,7 +225,7 @@ face_recognition/
 
 - macOS (10.14 sau mai recent)
 - Python 3.8 sau mai recent
-- pip (managerul de pachete Python)
+- Xcode Command Line Tools (pentru compilarea camerei)
 - Cameră web funcțională (opțional, pentru captură foto)
 
 ### Pași de instalare
@@ -240,28 +237,27 @@ cd ~/Desktop
 # Proiectul ar trebui să fie deja în face_recognition/
 ```
 
-#### Pasul 2: Creează un mediu virtual (recomandat)
+#### Pasul 2: Instalează dependențele
 
 ```bash
 cd face_recognition
-python3 -m venv venv
-source venv/bin/activate
+pip3 install -r requirements.txt
 ```
 
-#### Pasul 3: Instalează dependențele
+Sau manual:
+```bash
+pip3 install django watchdog requests pyngrok qrcode
+```
+
+> **Notă**: Nu este nevoie de mediu virtual (venv). Camera folosește AVFoundation (framework macOS nativ) - nu necesită instalare separată. La prima rulare, sistemul compilează automat un mic binar Swift pentru captura foto.
+
+#### Pasul 3: Inițializează baza de date
 
 ```bash
-pip install django watchdog requests pyngrok qrcode
-brew install imagesnap
+python3 manage.py migrate
 ```
 
-#### Pasul 4: Inițializează baza de date
-
-```bash
-python manage.py migrate
-```
-
-#### Pasul 5: Configurează folderul protejat
+#### Pasul 4: Configurează folderul protejat
 
 Editează `config.py` și setează:
 
@@ -273,7 +269,7 @@ PROTECTED_FOLDER = "Confidential"
 PROTECTED_FOLDER = "/Users/numeletău/Desktop/FolderSecret"
 ```
 
-#### Pasul 6: Configurează ngrok (opțional, pentru acces de pe telefon)
+#### Pasul 5: Configurează ngrok (opțional, pentru acces de pe telefon)
 
 1. Creează un cont pe [ngrok.com](https://ngrok.com)
 2. Copiază token-ul de autentificare
@@ -286,10 +282,10 @@ PROTECTED_FOLDER = "/Users/numeletău/Desktop/FolderSecret"
 python3 --version
 
 # Verifică că Django funcționează
-python manage.py check
+python3 manage.py check
 
-# Verifică că imagesnap funcționează
-imagesnap -h
+# Verifică că Swift (pentru cameră) funcționează
+swiftc --version
 ```
 
 ---
@@ -304,8 +300,7 @@ Trebuie să pornești **ambele componente** în terminale separate:
 
 ```bash
 cd ~/Desktop/face_recognition
-source venv/bin/activate  # dacă folosești mediu virtual
-python run_server.py
+python3 run_server.py
 ```
 
 Vei vedea:
@@ -317,8 +312,7 @@ Vei vedea:
 
 ```bash
 cd ~/Desktop/face_recognition
-source venv/bin/activate  # dacă folosești mediu virtual
-python monitor.py
+python3 monitor.py
 ```
 
 Vei vedea:
@@ -351,164 +345,7 @@ Vei vedea:
 
 ---
 
-## 8. Pornire automată la login
-
-Pentru utilizare zilnică, poți configura **atât monitorul cât și serverul** să pornească automat când te loghezi pe Mac. Acest lucru asigură protecție continuă și acces la dashboard fără intervenție manuală.
-
-### Ce este LaunchAgent?
-
-macOS folosește un sistem numit **launchd** pentru a gestiona serviciile și aplicațiile care pornesc automat. Un **LaunchAgent** este un proces care rulează în contextul utilizatorului (nu ca root/administrator).
-
-### Fișiere implicate
-
-| Fișier | Descriere |
-|--------|-----------|
-| `setup_autostart.sh` | Script Bash pentru gestionarea serviciilor |
-| `com.security.monitor.plist` | Configurare LaunchAgent pentru monitor |
-| `com.security.server.plist` | Configurare LaunchAgent pentru server |
-
-### Cum funcționează
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    FLUX PORNIRE AUTOMATĂ                     │
-└─────────────────────────────────────────────────────────────┘
-
-    Login utilizator
-          │
-          ▼
-    macOS launchd detectează
-    LaunchAgents instalate
-          │
-          ├─────────────────────────────┐
-          ▼                             ▼
-    Pornește automat              Pornește automat
-    monitor.py                    run_server.py
-          │                             │
-          ▼                             ▼
-    Monitorizează                 Dashboard disponibil
-    folderul protejat             la localhost:5000
-          │                             │
-          ▼                             ▼
-    Log: /tmp/security_monitor.log     Log: /tmp/security_server.log
-```
-
-### Comenzi disponibile
-
-Scriptul `setup_autostart.sh` oferă următoarele comenzi:
-
-| Comandă | Descriere |
-|---------|-----------|
-| `install` | Instalează și activează pornirea automată la login |
-| `uninstall` | Dezinstalează și dezactivează pornirea automată |
-| `status` | Afișează statusul serviciilor |
-| `start` | Pornește manual ambele servicii |
-| `stop` | Oprește ambele servicii |
-| `restart` | Repornește ambele servicii |
-| `logs` | Afișează log-urile în timp real |
-
-### Instalare (activare pornire automată)
-
-```bash
-cd ~/Desktop/face_recognition
-chmod +x setup_autostart.sh
-./setup_autostart.sh install
-```
-
-**Ce face:**
-1. Verifică că fișierele `.plist` există
-2. Creează directorul `~/Library/LaunchAgents/` (dacă nu există)
-3. Copiază ambele fișiere `.plist` în acest director
-4. Înregistrează și pornește ambele servicii
-
-**Output exemplu:**
-```
-======================================================
-  Instalare Pornire Automată - Sistem de Securitate
-======================================================
-
-Instalare Monitor...
-✓ Monitor instalat și pornit
-
-Instalare Server...
-✓ Server instalat și pornit
-
-======================================================
-✓ Instalare completă!
-======================================================
-```
-
-### Dezinstalare (dezactivare pornire automată)
-
-```bash
-./setup_autostart.sh uninstall
-```
-
-**Ce face:**
-1. Oprește ambele servicii dacă rulează
-2. Șterge fișierele `.plist` din LaunchAgents
-
-### Verificare status
-
-```bash
-./setup_autostart.sh status
-```
-
-**Output exemplu:**
-```
-======================================================
-  Status Servicii
-======================================================
-
-Monitor (com.security.monitor):
-✓ Instalat pentru pornire automată
-✓ Rulează în prezent
-
-Server (com.security.server):
-✓ Instalat pentru pornire automată
-✓ Rulează în prezent
-
-======================================================
-```
-
-### Control manual servicii
-
-```bash
-# Pornește ambele servicii
-./setup_autostart.sh start
-
-# Oprește ambele servicii
-./setup_autostart.sh stop
-
-# Repornește ambele servicii
-./setup_autostart.sh restart
-```
-
-### Verificare log-uri
-
-Ambele servicii salvează log-uri în `/tmp/`:
-
-```bash
-# Vezi log-urile în timp real (ambele)
-./setup_autostart.sh logs
-
-# Sau manual pentru fiecare:
-tail -f /tmp/security_monitor.log
-tail -f /tmp/security_server.log
-```
-
-### După instalare
-
-După ce rulezi `./setup_autostart.sh install`:
-
-1. **Imediat**: Ambele servicii pornesc și sunt funcționale
-2. **La fiecare login**: Serviciile pornesc automat
-3. **Dashboard**: Disponibil la `http://localhost:5000`
-4. **Protecție**: Folderul este monitorizat continuu
-
----
-
-## 9. Întrebări frecvente
+## 8. Întrebări frecvente
 
 ### Q: Ce se întâmplă dacă serverul nu răspunde?
 
@@ -516,7 +353,7 @@ După ce rulezi `./setup_autostart.sh install`:
 
 ### Q: Pot folosi sistemul fără cameră web?
 
-**A:** Da! Dacă imagesnap nu este instalat sau camera nu este disponibilă, sistemul funcționează normal, dar fără captură foto. Vei vedea un avertisment la pornire.
+**A:** Da! Dacă camera nu este disponibilă sau nu ai acordat permisiunea de acces, sistemul funcționează normal, dar fără captură foto. Camera folosește framework-ul nativ macOS AVFoundation - nu necesită software extern.
 
 ### Q: Cum schimb timpul de așteptare pentru aprobare?
 
@@ -560,6 +397,6 @@ Pentru întrebări sau probleme, verifică:
 
 ---
 
-**Autor:** Paul Socarde
+**Autor:** Bascacov Alexandra
 **Versiune:** 1.0
 **Ultima actualizare:** Ianuarie 2025

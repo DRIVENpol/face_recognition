@@ -4,7 +4,7 @@ Configurări pentru Sistemul de Control al Accesului la Foldere
 Acest fișier conține toate setările configurabile ale sistemului.
 Modificați valorile de mai jos pentru a personaliza comportamentul aplicației.
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 
@@ -51,13 +51,13 @@ USE_NGROK = True
 # Folderul care va fi protejat poate fi specificat în două moduri:
 # 1. Doar numele folderului: "Confidential"
 #    (va fi căutat automat în SEARCH_ROOT)
-# 2. Calea completă: "/Users/paulsocarde/Desktop/SecretFolder"
+# 2. Calea completă: "~/Desktop/SecretFolder"
 #    (se folosește exact această cale)
 PROTECTED_FOLDER = "Confidential"
 
 # Directorul rădăcină unde se caută folderul protejat
 # (folosit doar dacă PROTECTED_FOLDER este un nume, nu o cale completă)
-SEARCH_ROOT = "/Users/paulsocarde"
+SEARCH_ROOT = os.path.expanduser("~")
 
 # ============================================================================
 # SETĂRI ALERTĂ

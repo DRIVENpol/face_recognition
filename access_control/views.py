@@ -12,7 +12,7 @@ Endpoint-uri disponibile:
     POST /api/decide/X  -> decide()         - Aprobă sau respinge o încercare
     GET  /captures/X    -> serve_capture()  - Servește fotografiile capturate
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 

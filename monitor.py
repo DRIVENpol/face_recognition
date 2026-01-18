@@ -12,7 +12,7 @@ Descriere:
     5. Așteaptă decizia administratorului (aprobare/respingere)
     6. Dacă este aprobat, deschide folderul; dacă nu, blochează ecranul
 
-Autor: Paul Socarde
+Autor: Bascacov Alexandra
 Versiune: 1.0
 """
 
@@ -20,6 +20,7 @@ import os
 import time
 import subprocess
 import requests
+import threading
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -27,42 +28,174 @@ from config import (
     PROTECTED_FOLDER, SEARCH_ROOT, SERVER_URL, APPROVAL_TIMEOUT, ACCESS_COOLDOWN
 )
 
-import shutil
-
-IMAGESNAP_AVAILABLE = shutil.which('imagesnap') is not None
-
 # Directorul unde se salvează fotografiile capturate
 CAPTURES_DIR = os.path.join(os.path.dirname(__file__), 'captures')
 
 
+# Path to pre-compiled camera capture binary
+_CAMERA_BINARY = os.path.join(os.path.dirname(__file__), '.camera_capture')
+_CAMERA_SOURCE = os.path.join(os.path.dirname(__file__), '.camera_capture.swift')
+
+# Swift source code for camera capture
+_SWIFT_CAMERA_CODE = '''
+import AVFoundation
+import CoreImage
+import Foundation
+
+class CameraCapture: NSObject, AVCapturePhotoCaptureDelegate {
+    var session: AVCaptureSession?
+    var photoOutput: AVCapturePhotoOutput?
+    var capturedData: Data?
+    var isDone = false
+
+    func capture(to path: String) -> Bool {
+        guard let device = AVCaptureDevice.default(for: .video) else {
+            fputs("No camera found\\n", stderr)
+            return false
+        }
+
+        session = AVCaptureSession()
+        session?.sessionPreset = .photo
+
+        guard let input = try? AVCaptureDeviceInput(device: device) else {
+            fputs("Cannot create input\\n", stderr)
+            return false
+        }
+
+        if session?.canAddInput(input) == true {
+            session?.addInput(input)
+        }
+
+        photoOutput = AVCapturePhotoOutput()
+        if session?.canAddOutput(photoOutput!) == true {
+            session?.addOutput(photoOutput!)
+        }
+
+        session?.startRunning()
+
+        // Wait for camera to warm up
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.5))
+
+        let settings = AVCapturePhotoSettings()
+        photoOutput?.capturePhoto(with: settings, delegate: self)
+
+        // Run the run loop until capture is done or timeout
+        let timeout = Date(timeIntervalSinceNow: 5)
+        while !isDone && Date() < timeout {
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+        }
+
+        session?.stopRunning()
+
+        if !isDone {
+            fputs("Capture timed out\\n", stderr)
+            return false
+        }
+
+        guard let data = capturedData else {
+            fputs("No data captured\\n", stderr)
+            return false
+        }
+
+        do {
+            try data.write(to: URL(fileURLWithPath: path))
+            return true
+        } catch {
+            fputs("Failed to write: \\(error)\\n", stderr)
+            return false
+        }
+    }
+
+    func photoOutput(_ output: AVCapturePhotoOutput, didFinishProcessingPhoto photo: AVCapturePhoto, error: Error?) {
+        if let error = error {
+            fputs("Photo error: \\(error)\\n", stderr)
+        } else {
+            capturedData = photo.fileDataRepresentation()
+        }
+        isDone = true
+    }
+}
+
+guard CommandLine.arguments.count > 1 else {
+    fputs("Usage: camera_capture <output_path>\\n", stderr)
+    exit(1)
+}
+
+let capture = CameraCapture()
+let success = capture.capture(to: CommandLine.arguments[1])
+exit(success ? 0 : 1)
+'''
+
+
+def _ensure_camera_binary():
+    """
+    Ensure the camera capture binary exists and is compiled.
+    Compiles on first run or if source is newer than binary.
+    """
+    # Check if binary exists and is up to date
+    if os.path.exists(_CAMERA_BINARY):
+        return True
+
+    print("[DEBUG] Compiling camera capture binary...")
+
+    try:
+        # Write Swift source
+        with open(_CAMERA_SOURCE, 'w') as f:
+            f.write(_SWIFT_CAMERA_CODE)
+
+        # Compile to binary
+        result = subprocess.run(
+            ['swiftc', _CAMERA_SOURCE, '-o', _CAMERA_BINARY,
+             '-framework', 'AVFoundation', '-framework', 'CoreImage',
+             '-framework', 'Foundation'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode != 0:
+            print(f"[DEBUG] Swift compilation failed: {result.stderr}")
+            return False
+
+        # Clean up source file
+        os.unlink(_CAMERA_SOURCE)
+        print("[DEBUG] Camera binary compiled successfully")
+        return True
+
+    except Exception as e:
+        print(f"[DEBUG] Failed to compile camera binary: {e}")
+        return False
+
+
 def capture_photo():
     """
-    Capturează o fotografie de la camera web și o salvează.
+    Capture photo using native macOS AVFoundation framework.
+    Works on any Mac without additional software like imagesnap.
+    Uses a compiled Swift binary for reliable camera access.
 
-    Această funcție este apelată automat când cineva încearcă să acceseze
-    folderul protejat. Fotografia este trimisă către administrator pentru
-    a verifica identitatea persoanei care solicită accesul.
-
-    Returnează:
-        str: Numele fișierului salvat (ex: 'capture_20250117_143052.jpg')
-        None: Dacă captura a eșuat sau imagesnap nu este disponibil
+    Returns:
+        str: Filename of saved photo (e.g., 'capture_20250117_143052.jpg')
+        None: If capture failed or no camera available
     """
-    if not IMAGESNAP_AVAILABLE:
-        print("[DEBUG] imagesnap nu este disponibil - se omite captura foto")
-        return None
-
     os.makedirs(CAPTURES_DIR, exist_ok=True)
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f'capture_{timestamp}.jpg'
     filepath = os.path.join(CAPTURES_DIR, filename)
 
-    print(f"[DEBUG] Se capturează fotografia...")
+    print(f"[DEBUG] Se capturează fotografia cu AVFoundation...")
+
+    # Ensure camera binary is compiled
+    if not _ensure_camera_binary():
+        print("[DEBUG] Camera binary not available")
+        return None
 
     try:
+        # Run the camera capture binary
         result = subprocess.run(
-            ['imagesnap', '-q', filepath],
+            [_CAMERA_BINARY, filepath],
             capture_output=True,
+            text=True,
             timeout=10
         )
 
@@ -70,9 +203,18 @@ def capture_photo():
             print(f"[DEBUG] Fotografie salvată: {filename}")
             return filename
         else:
+            if result.stderr:
+                # Filter out the harmless KVO warning
+                errors = [l for l in result.stderr.strip().split('\n')
+                          if 'NSKVONotifying' not in l]
+                if errors:
+                    print(f"[DEBUG] Camera error: {'; '.join(errors)}")
             print("[DEBUG] Eșec la capturarea fotografiei")
             return None
 
+    except subprocess.TimeoutExpired:
+        print("[DEBUG] Camera capture timed out")
+        return None
     except Exception as e:
         print(f"[DEBUG] Eroare la capturarea fotografiei: {e}")
         return None
@@ -176,7 +318,6 @@ class FinderWindowMonitor:
         Creează un fir de execuție (thread) separat care verifică periodic
         toate ferestrele Finder pentru a detecta accesul la folderul protejat.
         """
-        import threading
         self.running = True
         self.thread = threading.Thread(target=self._poll_loop, daemon=True)
         self.thread.start()
