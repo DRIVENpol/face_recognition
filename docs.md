@@ -155,7 +155,7 @@ Stochează toate încercările de acces pentru audit și istoric.
 | Bibliotecă | Versiune | Utilizare |
 |------------|----------|-----------|
 | Django | 4.2+ | Framework web pentru dashboard |
-| OpenCV (cv2) | 4.x | Capturare foto de la camera web |
+| imagesnap | - | Capturare foto de la camera web (macOS CLI tool) |
 | watchdog | 3.x | Monitorizare modificări fișiere |
 | requests | 2.x | Comunicare HTTP cu serverul |
 | pyngrok | 5.x | Tunel pentru acces de la distanță |
@@ -251,7 +251,8 @@ source venv/bin/activate
 #### Pasul 3: Instalează dependențele
 
 ```bash
-pip install django opencv-python watchdog requests pyngrok qrcode
+pip install django watchdog requests pyngrok qrcode
+brew install imagesnap
 ```
 
 #### Pasul 4: Inițializează baza de date
@@ -287,8 +288,8 @@ python3 --version
 # Verifică că Django funcționează
 python manage.py check
 
-# Verifică că OpenCV funcționează
-python -c "import cv2; print('OpenCV OK')"
+# Verifică că imagesnap funcționează
+imagesnap -h
 ```
 
 ---
@@ -515,7 +516,7 @@ După ce rulezi `./setup_autostart.sh install`:
 
 ### Q: Pot folosi sistemul fără cameră web?
 
-**A:** Da! Dacă OpenCV nu este instalat sau camera nu este disponibilă, sistemul funcționează normal, dar fără captură foto. Vei vedea un avertisment la pornire.
+**A:** Da! Dacă imagesnap nu este instalat sau camera nu este disponibilă, sistemul funcționează normal, dar fără captură foto. Vei vedea un avertisment la pornire.
 
 ### Q: Cum schimb timpul de așteptare pentru aprobare?
 

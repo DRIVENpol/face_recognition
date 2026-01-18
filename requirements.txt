@@ -3,4 +3,3 @@ requests
 pyngrok
 qrcode
 watchdog
-opencv-python

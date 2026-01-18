@@ -27,14 +27,9 @@ from config import (
     PROTECTED_FOLDER, SEARCH_ROOT, SERVER_URL, APPROVAL_TIMEOUT, ACCESS_COOLDOWN
 )
 
-# Încercăm să importăm OpenCV pentru capturarea fotografiilor
-# OpenCV este o bibliotecă pentru procesarea imaginilor și video
-try:
-    import cv2
-    OPENCV_AVAILABLE = True
-except ImportError:
-    OPENCV_AVAILABLE = False
-    print("Avertisment: OpenCV nu este instalat. Captura foto este dezactivată. Rulează: pip install opencv-python")
+import shutil
+
+IMAGESNAP_AVAILABLE = shutil.which('imagesnap') is not None
 
 # Directorul unde se salvează fotografiile capturate
 CAPTURES_DIR = os.path.join(os.path.dirname(__file__), 'captures')
@@ -50,17 +45,14 @@ def capture_photo():
 
     Returnează:
         str: Numele fișierului salvat (ex: 'capture_20250117_143052.jpg')
-        None: Dacă captura a eșuat sau OpenCV nu este disponibil
+        None: Dacă captura a eșuat sau imagesnap nu este disponibil
     """
-    if not OPENCV_AVAILABLE:
-        print("[DEBUG] OpenCV nu este disponibil - se omite captura foto")
+    if not IMAGESNAP_AVAILABLE:
+        print("[DEBUG] imagesnap nu este disponibil - se omite captura foto")
         return None
 
-    # Ne asigurăm că directorul pentru capturi există
     os.makedirs(CAPTURES_DIR, exist_ok=True)
 
-    # Generăm numele fișierului cu marca temporală (timestamp)
-    # Format: capture_YYYYMMDD_HHMMSS.jpg
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filename = f'capture_{timestamp}.jpg'
     filepath = os.path.join(CAPTURES_DIR, filename)
@@ -68,29 +60,17 @@ def capture_photo():
     print(f"[DEBUG] Se capturează fotografia...")
 
     try:
-        # Deschidem camera web (0 = camera implicită/principală)
-        cap = cv2.VideoCapture(0)
+        result = subprocess.run(
+            ['imagesnap', '-q', filepath],
+            capture_output=True,
+            timeout=10
+        )
 
-        if not cap.isOpened():
-            print("[DEBUG] Nu s-a putut deschide camera web")
-            return None
-
-        # Așteptăm puțin pentru ca camera să se inițializeze
-        time.sleep(0.5)
-
-        # Capturăm un cadru (frame) de la cameră
-        ret, frame = cap.read()
-
-        # Eliberăm camera pentru alte aplicații
-        cap.release()
-
-        if ret:
-            # Salvăm imaginea pe disc
-            cv2.imwrite(filepath, frame)
+        if result.returncode == 0 and os.path.exists(filepath):
             print(f"[DEBUG] Fotografie salvată: {filename}")
             return filename
         else:
-            print("[DEBUG] Eșec la capturarea cadrului")
+            print("[DEBUG] Eșec la capturarea fotografiei")
             return None
 
     except Exception as e:
