@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Folder Access Control - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00d4ff;
+        }
+
+        .status-bar {
+            text-align: center;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            background: #16213e;
+        }
+
+        .status-bar.alert {
+            background: #ff4757;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .pending-section {
+            margin-bottom: 40px;
+        }
+
+        .pending-section h2 {
+            color: #ff4757;
+            margin-bottom: 15px;
+        }
+
+        .attempt-card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .attempt-card.pending {
+            border: 2px solid #ff4757;
+        }
+
+        .attempt-card.approved {
+            border: 2px solid #2ed573;
+            opacity: 0.7;
+        }
+
+        .attempt-card.denied {
+            border: 2px solid #ff4757;
+            opacity: 0.7;
+        }
+
+        .folder-icon {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            background: #0f3460;
+            border-radius: 12px;
+            flex-shrink: 0;
+        }
+
+        .photo-thumbnail {
+            width: 100px;
+            height: 100px;
+            min-width: 100px;
+            min-height: 100px;
+            object-fit: cover;
+            border-radius: 12px;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: block;
+            background: #0f3460;
+        }
+
+        .photo-thumbnail:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+
+        /* Photo container for better mobile display */
+        .photo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        /* Lightbox styles */
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .lightbox.active {
+            display: flex;
+        }
+
+        .lightbox img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: #fff;
+            cursor: pointer;
+            z-index: 1001;
+        }
+
+        .lightbox-close:hover {
+            color: #00d4ff;
+        }
+
+        .attempt-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .attempt-info p {
+            margin: 5px 0;
+            color: #aaa;
+        }
+
+        .attempt-info .timestamp {
+            font-size: 1.1em;
+            color: #fff;
+        }
+
+        .attempt-info .folder-path {
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.9em;
+            color: #00d4ff;
+            word-break: break-all;
+            background: #0f3460;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+        }
+
+        .attempt-info .access-type {
+            display: inline-block;
+            background: #e17055;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            text-transform: uppercase;
+        }
+
+        .attempt-info .status {
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status.pending { color: #ffa502; }
+        .status.approved { color: #2ed573; }
+        .status.denied { color: #ff4757; }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-approve {
+            background: #2ed573;
+            color: #000;
+        }
+
+        .btn-deny {
+            background: #ff4757;
+            color: #fff;
+        }
+
+        .timer {
+            font-size: 24px;
+            color: #ff4757;
+            font-weight: bold;
+        }
+
+        .history-section h2 {
+            color: #aaa;
+            margin-bottom: 0;
+        }
+
+        .history-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .sort-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .sort-controls select {
+            background: #16213e;
+            color: #eee;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .sort-controls select:hover {
+            border-color: #00d4ff;
+        }
+
+        .sort-controls select:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+
+        .sort-order-btn {
+            background: #16213e;
+            color: #eee;
+            border: 1px solid #0f3460;
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 16px;
+            cursor: pointer;
+            min-width: 40px;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .sort-order-btn:hover {
+            border-color: #00d4ff;
+            transform: scale(1.05);
+        }
+
+        .no-attempts {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        audio {
+            display: none;
+        }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+                margin-bottom: 15px;
+            }
+
+            .attempt-card {
+                flex-direction: column;
+                padding: 15px;
+                gap: 15px;
+                align-items: stretch;
+            }
+
+            .folder-icon {
+                width: 80px;
+                height: 80px;
+                font-size: 48px;
+                align-self: center;
+            }
+
+            .photo-thumbnail {
+                width: 150px !important;
+                height: 150px !important;
+                min-width: 150px !important;
+                min-height: 150px !important;
+                align-self: center;
+                margin: 0 auto;
+            }
+
+            .photo-container {
+                width: 100%;
+                display: flex;
+                justify-content: center;
+            }
+
+            .attempt-info {
+                width: 100%;
+                text-align: center;
+            }
+
+            .attempt-info p {
+                font-size: 14px;
+            }
+
+            .attempt-info .timestamp {
+                font-size: 1em;
+            }
+
+            .attempt-info .folder-path {
+                font-size: 0.8em;
+                text-align: left;
+            }
+
+            .buttons {
+                flex-direction: column;
+                width: 100%;
+                gap: 10px;
+            }
+
+            button {
+                width: 100%;
+                padding: 18px;
+                font-size: 18px;
+            }
+
+            .timer {
+                font-size: 32px;
+                text-align: center;
+            }
+
+            .status-bar {
+                font-size: 14px;
+                padding: 12px;
+            }
+
+            .pending-section h2,
+            .history-section h2 {
+                font-size: 1.2em;
+            }
+
+            .history-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .sort-controls {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .sort-controls select {
+                flex: 1;
+                max-width: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Folder Access Control</h1>
+
+        <div class="status-bar" id="statusBar">
+            Monitoring... No pending attempts
+        </div>
+
+        <div class="pending-section">
+            <h2>Pending Approval</h2>
+            <div id="pendingAttempts">
+                <div class="no-attempts">No pending attempts</div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="history-header">
+                <h2>History</h2>
+                <div class="sort-controls">
+                    <select id="sortBy">
+                        <option value="time">Time</option>
+                        <option value="status">Status</option>
+                    </select>
+                    <button id="sortOrder" class="sort-order-btn" title="Toggle sort order">↓</button>
+                </div>
+            </div>
+            <div id="historyAttempts">
+                <div class="no-attempts">No history yet</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox for photo zoom -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+        <img id="lightbox-img" src="" alt="Captured photo">
+    </div>
+
+    <audio id="alertSound">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdH2IkZaXlpGLhH54dXV4fYOKj5OVlZOQi4Z/enZ0dXl+hIqPk5WVk5CKhX95dXR1eX6EiY6Sk5STkIuGgHt3dXZ5fYOIjZGTk5KQi4aAfHd1dnh8goeNkZOTkpCLhoF8eHZ3eXyBh4yQkpOSkIuGgXx4dnd5fIGGjJCSkpKQi4aCfXl3eHp8gYaMkJKSkZCLhoJ9eXd4enyBhoyQkpKRkIuGgn15eHh6fIGGi5CRkpGQi4aCfXl4eHp8gYaLkJGSkZCLhoJ9eXh4enz/f4aLj5GRkJCLh4J9enh4enz/f4WKj5CQkI+Lh4N+enh4eXv+foWKj5CQkI+Lh4N+e3l4eXv+foWKjpCQj4+Lh4N+e3l5eXv+foSJjo+Pj46Lh4N/e3p5eXv9fYSJjo+Pj46Kh4N/e3p5eXv9fYSJjo+Pj46Kh4N/fHp5eXr9fYSJjo+Pjo6Kh4OAfHp5eXr9fYSIjY6Ojo6Kh4OAfHt6eXr8fIOIjY6Ojo6JhoOAfHt6enr8fIOIjY6OjY2JhoOAfHt6enr8fIOHjI2NjY2JhoOAfHt6enr8e4OHjI2NjY2JhoOAfHx7e3v8e4KHjI2NjYyIhYKAfHx7e3v7e4KHjIyMjIyIhYKAfHx7e3v7e4KHjIyMjIyIhYKAfHx7fHv7eoKGi4yMjIuIhYKBfXx7fHz7eoKGi4uLi4uIhYKBfX18fHz6eoGGi4uLi4uIhYGBfX18fHz6eoGGi4uLi4uHhIGBfX19fX36eYGFioqKioqHhIGBfn19fX35eYCFioqKiomHhIGBfn5+fn35eYCFiYmJiYmHhIGBfn5+fn34eICFiYmJiYmGg4CBfn5+f334eICEiImJiYiFg4CBf39/f333d3+EiIiIiIiFg4CCf39/gH33d3+EiIiIiIiEgoCAf4CAf333d3+Dh4eHh4eDgoCAf4CAgH32d36Dh4eHh4eDgn+AgICAgH32dn2Dh4aGhoaCgn+AgIGBgH31dn2Cho" type="audio/wav">
+    </audio>
+
+    <script>
+        const TIMEOUT = {{ timeout }};
+        let timers = {};
+        let notificationPermission = 'default';
+
+        // Sort state - default: descending by time (newest first)
+        let sortBy = 'time';
+        let sortOrder = 'desc';
+
+        // Sort function for history
+        function sortHistory(history) {
+            return [...history].sort((a, b) => {
+                let comparison;
+                if (sortBy === 'time') {
+                    comparison = new Date(a.timestamp) - new Date(b.timestamp);
+                } else {
+                    // Status: alphabetical (approved before denied)
+                    comparison = a.status.localeCompare(b.status);
+                }
+                return sortOrder === 'desc' ? -comparison : comparison;
+            });
+        }
+
+        // Update sort order button appearance
+        function updateSortOrderButton() {
+            const btn = document.getElementById('sortOrder');
+            btn.textContent = sortOrder === 'desc' ? '↓' : '↑';
+            btn.title = sortOrder === 'desc' ? 'Newest first' : 'Oldest first';
+        }
+
+        // Request notification permission on page load
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                notificationPermission = permission;
+            });
+        }
+
+        function sendBrowserNotification(title, body) {
+            if (notificationPermission === 'granted') {
+                const notification = new Notification(title, {
+                    body: body,
+                    icon: '📁',
+                    tag: 'access-alert',
+                    requireInteraction: true
+                });
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+            }
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+
+        function formatAccessType(accessType) {
+            if (!accessType) return 'folder';
+            // Convert folder_created, folder_modified etc to readable format
+            return accessType.replace('folder_', '').replace('_', ' ');
+        }
+
+        function getShortPath(fullPath) {
+            // Get just the last 2-3 components for display
+            const parts = fullPath.split('/').filter(p => p);
+            if (parts.length <= 3) return fullPath;
+            return '.../' + parts.slice(-3).join('/');
+        }
+
+        function playAlert() {
+            const audio = document.getElementById('alertSound');
+            audio.play().catch(() => {});
+        }
+
+        // Lightbox functions
+        function openLightbox(imageSrc) {
+            const lightbox = document.getElementById('lightbox');
+            const lightboxImg = document.getElementById('lightbox-img');
+            lightboxImg.src = imageSrc;
+            lightbox.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeLightbox() {
+            const lightbox = document.getElementById('lightbox');
+            lightbox.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close lightbox on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeLightbox();
+        });
+
+        function getMediaElement(attempt) {
+            // Check if there's a captured photo
+            if (attempt.photo_path) {
+                const photoUrl = `/captures/${attempt.photo_path}`;
+                return `<div class="photo-container">
+                    <img class="photo-thumbnail" src="${photoUrl}" alt="Captured photo" onclick="openLightbox('${photoUrl}')" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'folder-icon\\'>📷</div>';">
+                </div>`;
+            }
+            // Legacy: check if access_type is 'photo' (old records)
+            if (attempt.access_type === 'photo' && attempt.access_path) {
+                const photoUrl = `/captures/${attempt.access_path}`;
+                return `<div class="photo-container">
+                    <img class="photo-thumbnail" src="${photoUrl}" alt="Captured photo" onclick="openLightbox('${photoUrl}')" onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'folder-icon\\'>📷</div>';">
+                </div>`;
+            }
+            // Default folder icon
+            return '<div class="folder-icon">📁</div>';
+        }
+
+        function createAttemptCard(attempt, isPending) {
+            const card = document.createElement('div');
+            card.className = `attempt-card ${attempt.status}`;
+            card.id = `attempt-${attempt.id}`;
+
+            let timerHtml = '';
+            if (isPending) {
+                // Calculate remaining time BEFORE creating HTML so correct value is rendered immediately
+                const elapsed = Math.floor((Date.now() - new Date(attempt.timestamp).getTime()) / 1000);
+                const remaining = Math.max(0, TIMEOUT - elapsed);
+                timerHtml = `<div class="timer" id="timer-${attempt.id}">${remaining}</div>`;
+            }
+
+            const buttonsHtml = isPending ? `
+                <div class="buttons">
+                    <button class="btn-approve" onclick="decide(${attempt.id}, 'approved')">APPROVE</button>
+                    <button class="btn-deny" onclick="decide(${attempt.id}, 'denied')">DENY</button>
+                </div>
+            ` : '';
+
+            // Determine display path (for photos, just show filename; for folders, show full path)
+            const displayPath = attempt.access_type === 'photo'
+                ? attempt.access_path
+                : attempt.access_path;
+
+            card.innerHTML = `
+                ${getMediaElement(attempt)}
+                <div class="attempt-info">
+                    <p class="timestamp">${formatDate(attempt.timestamp)}</p>
+                    <div class="folder-path" title="${attempt.access_path}">${displayPath}</div>
+                    <p><span class="access-type">${formatAccessType(attempt.access_type)}</span></p>
+                    <p>ID: ${attempt.id} | Status: <span class="status ${attempt.status}">${attempt.status}</span></p>
+                    ${attempt.decided_at ? `<p>Decided: ${formatDate(attempt.decided_at)}</p>` : ''}
+                </div>
+                ${timerHtml}
+                ${buttonsHtml}
+            `;
+
+            // Note: startTimer is called AFTER card is appended to DOM in loadAttempts()
+            return card;
+        }
+
+        function startTimer(attemptId, createdAt) {
+            if (timers[attemptId]) clearInterval(timers[attemptId]);
+
+            // Calculate remaining time based on server timestamp
+            const elapsed = Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
+            let seconds = Math.max(0, TIMEOUT - elapsed);
+
+            // Update display immediately
+            const timerEl = document.getElementById(`timer-${attemptId}`);
+            if (timerEl) timerEl.textContent = seconds;
+
+            if (seconds <= 0) {
+                decide(attemptId, 'denied');
+                return;
+            }
+
+            timers[attemptId] = setInterval(() => {
+                seconds--;
+                const timerEl = document.getElementById(`timer-${attemptId}`);
+                if (timerEl) {
+                    timerEl.textContent = seconds;
+                }
+                if (seconds <= 0) {
+                    clearInterval(timers[attemptId]);
+                    delete timers[attemptId];
+                    decide(attemptId, 'denied');
+                }
+            }, 1000);
+        }
+
+        async function decide(attemptId, decision) {
+            if (timers[attemptId]) {
+                clearInterval(timers[attemptId]);
+                delete timers[attemptId];
+            }
+
+            await fetch(`/api/decide/${attemptId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decision })
+            });
+
+            loadAttempts();
+        }
+
+        let lastPendingCount = 0;
+
+        async function loadAttempts() {
+            const response = await fetch('/api/attempts');
+            const attempts = await response.json();
+
+            const pending = attempts.filter(a => a.status === 'pending');
+            const history = attempts.filter(a => a.status !== 'pending');
+
+            // Update status bar
+            const statusBar = document.getElementById('statusBar');
+            if (pending.length > 0) {
+                statusBar.textContent = `ALERT: ${pending.length} pending approval(s)!`;
+                statusBar.classList.add('alert');
+                if (pending.length > lastPendingCount) {
+                    playAlert();
+                    // Send browser push notification
+                    const latestPending = pending[0];
+                    sendBrowserNotification(
+                        '🚨 Access Attempt Detected!',
+                        `Path: ${latestPending.access_path}\nAwaiting your approval...`
+                    );
+                }
+            } else {
+                statusBar.textContent = 'Monitoring... No pending attempts';
+                statusBar.classList.remove('alert');
+            }
+            lastPendingCount = pending.length;
+
+            // Clear all existing timers before re-rendering
+            Object.keys(timers).forEach(id => {
+                clearInterval(timers[id]);
+                delete timers[id];
+            });
+
+            // Update pending section with smart diff
+            const pendingDiv = document.getElementById('pendingAttempts');
+            const currentIds = new Set(pending.map(a => a.id));
+            const existingIds = new Set();
+
+            // Remove cards that are no longer pending
+            Array.from(pendingDiv.children).forEach(child => {
+                const id = child.id?.replace('attempt-', '');
+                if (id && !currentIds.has(parseInt(id))) {
+                    child.remove();
+                } else if (id) {
+                    existingIds.add(parseInt(id));
+                }
+            });
+
+            // Add new pending cards and start their timers
+            if (pending.length === 0) {
+                pendingDiv.innerHTML = '<div class="no-attempts">No pending attempts</div>';
+            } else {
+                // Remove "no attempts" message if present
+                const noAttempts = pendingDiv.querySelector('.no-attempts');
+                if (noAttempts) noAttempts.remove();
+
+                pending.forEach(attempt => {
+                    if (!existingIds.has(attempt.id)) {
+                        pendingDiv.appendChild(createAttemptCard(attempt, true));
+                    }
+                });
+
+                // Start timers AFTER all cards are in DOM (fixes timer showing wrong value on refresh)
+                pending.forEach(attempt => {
+                    startTimer(attempt.id, attempt.timestamp);
+                });
+            }
+
+            // Update history section - always rebuild (no state to preserve like timers)
+            const historyDiv = document.getElementById('historyAttempts');
+            if (history.length === 0) {
+                historyDiv.innerHTML = '<div class="no-attempts">No history yet</div>';
+            } else {
+                // Sort history before rendering
+                const sortedHistory = sortHistory(history);
+                historyDiv.innerHTML = '';
+                sortedHistory.forEach(attempt => {
+                    historyDiv.appendChild(createAttemptCard(attempt, false));
+                });
+            }
+        }
+
+        // Poll for new attempts every 2 seconds
+        setInterval(loadAttempts, 2000);
+        loadAttempts();
+
+        // Sort control event listeners
+        document.getElementById('sortBy').addEventListener('change', (e) => {
+            sortBy = e.target.value;
+            loadAttempts();
+        });
+
+        document.getElementById('sortOrder').addEventListener('click', () => {
+            sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+            updateSortOrderButton();
+            loadAttempts();
+        });
+    </script>
+</body>
+</html>

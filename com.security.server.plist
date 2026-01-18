@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Identificator unic pentru serviciu -->
+    <key>Label</key>
+    <string>com.security.server</string>
+
+    <!-- Comanda de executat -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/paulsocarde/Desktop/face_recognition/run_server.py</string>
+    </array>
+
+    <!-- Pornește automat la login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Repornește dacă se oprește -->
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Fișiere pentru log-uri -->
+    <key>StandardOutPath</key>
+    <string>/tmp/security_server.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/security_server.log</string>
+
+    <!-- Directorul de lucru -->
+    <key>WorkingDirectory</key>
+    <string>/Users/paulsocarde/Desktop/face_recognition</string>
+</dict>
+</plist>
